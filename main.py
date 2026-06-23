@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from telegram.constants import ParseMode
 
 # ============ CONFIG ============
-BOT_TOKEN = "8870758259:AAGQXtt0qcHGrmPVYCUsQN1ivTeP3eIyoqc"  # @BotFather se lo
+BOT_TOKEN = "8824870472:AAH0JY44z2zmLGlRtevjjD8-8CR79Dkslek"  # @BotFather se lo
 OWNER_ID = 7326248826  # Apna Telegram ID
 API_URL = "https://r-gengpt-api.vercel.app/api/video/download?url={url}"
 DATA_FILE = "user_data.json"
@@ -21,20 +21,17 @@ CHANNELS = [
     {
         "id": "-1003849265448", 
         "link": "https://t.me/SEMY_FF",
-        "name": "MAIN CHANNEL"
+        "name": "🎮 SEMY FF"
     },
     {
         "id": "-1003885062938", 
         "link": "https://t.me/+n0W7fc-r35JjNDRl",
-        "name": "📢 SEMY BOT"
+        "name": "📢 Main Channel"
     }
 ]
 
 # ============ LOGGING ============
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============ DATA FUNCTIONS ============
@@ -104,20 +101,17 @@ async def check_user_joined(user_id, context):
                 )
                 if member.status in ['left', 'kicked']:
                     return False
-            except Exception as e:
-                logger.error(f"Error checking channel {channel['id']}: {e}")
-                # If can't check, assume not joined
+            except:
                 return False
         return True
     except:
         return False
 
-async def show_join_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show join channels message with horizontal buttons"""
-    # Create horizontal buttons for channels
+async def get_join_keyboard():
+    """Create keyboard with channel buttons and verify button"""
     keyboard = []
     
-    # Channel buttons in horizontal rows (2 per row)
+    # Horizontal buttons for channels (2 per row)
     row = []
     for i, channel in enumerate(CHANNELS):
         row.append(InlineKeyboardButton(
@@ -128,21 +122,39 @@ async def show_join_channels(update: Update, context: ContextTypes.DEFAULT_TYPE)
             keyboard.append(row)
             row = []
     
-    # Verify button (full width)
+    # Verify button
     keyboard.append([InlineKeyboardButton(
         "✅ ᴠᴇʀɪꜰʏ", 
         callback_data="verify"
     )])
     
-    await update.message.reply_text(
-        "🔐 *ᴊᴏɪɴ ʀᴇQᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟꜱ*\n\n"
-        "• ᴛᴏ ᴜꜱᴇ ᴛʜɪꜱ ʙᴏᴛ, ʏᴏᴜ ᴍᴜꜱᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟꜱ\n"
-        "• ᴄʟɪᴄᴋ ᴇᴀᴄʜ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴊᴏɪɴ\n"
-        "• ᴀꜰᴛᴇʀ ᴊᴏɪɴɪɴɢ, ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ\n\n"
-        "📌 *ʀᴇQᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟꜱ:*",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    return InlineKeyboardMarkup(keyboard)
+
+async def show_join_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show join channels message with horizontal buttons"""
+    keyboard = await get_join_keyboard()
+    
+    # Check if it's a callback query or message
+    if update.callback_query:
+        await update.callback_query.message.reply_text(
+            "🔐 *ᴊᴏɪɴ ʀᴇQᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟꜱ*\n\n"
+            "• ᴛᴏ ᴜꜱᴇ ᴛʜɪꜱ ʙᴏᴛ, ʏᴏᴜ ᴍᴜꜱᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟꜱ\n"
+            "• ᴄʟɪᴄᴋ ᴇᴀᴄʜ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴊᴏɪɴ\n"
+            "• ᴀꜰᴛᴇʀ ᴊᴏɪɴɪɴɢ, ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ\n\n"
+            "📌 *ʀᴇQᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟꜱ:*",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard
+        )
+    else:
+        await update.message.reply_text(
+            "🔐 *ᴊᴏɪɴ ʀᴇQᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟꜱ*\n\n"
+            "• ᴛᴏ ᴜꜱᴇ ᴛʜɪꜱ ʙᴏᴛ, ʏᴏᴜ ᴍᴜꜱᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟꜱ\n"
+            "• ᴄʟɪᴄᴋ ᴇᴀᴄʜ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴊᴏɪɴ\n"
+            "• ᴀꜰᴛᴇʀ ᴊᴏɪɴɪɴɢ, ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ\n\n"
+            "📌 *ʀᴇQᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟꜱ:*",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard
+        )
 
 async def show_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show welcome message after verification"""
@@ -156,7 +168,6 @@ async def show_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ɪ ᴡɪʟʟ ꜱᴇɴᴅ ʏᴏᴜ ᴛʜᴇ ᴀᴜᴅɪᴏ! 🎧"
     )
     
-    # Check if it's a callback query or message
     if update.callback_query:
         await update.callback_query.message.reply_text(
             welcome_text,
@@ -169,7 +180,7 @@ async def show_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def handle_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle verify button"""
+    """Handle verify button - keeps showing buttons until user joins"""
     query = update.callback_query
     await query.answer()
     
@@ -181,38 +192,27 @@ async def handle_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
     
+    # Check if user joined all channels
     joined = await check_user_joined(user_id, context)
     
     if joined:
+        # User joined all channels - success!
         add_verified(user_id)
         await query.message.delete()
         await show_welcome(update, context)
     else:
+        # User hasn't joined - show error + buttons again
+        keyboard = await get_join_keyboard()
+        
         await query.message.edit_text(
             "❌ *ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰᴀɪʟᴇᴅ!*\n\n"
             "ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ ᴊᴏɪɴᴇᴅ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ʏᴇᴛ.\n\n"
             "ᴘʟᴇᴀꜱᴇ ᴊᴏɪɴ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ᴀɴᴅ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ᴀɢᴀɪɴ.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard  # Buttons again so user can retry
         )
-        # Show join channels again
-        await show_join_channels(update, context)
 
-async def check_verification_and_handle(update: Update, context: ContextTypes.DEFAULT_TYPE, is_callback=False):
-    """Check verification and handle accordingly"""
-    user_id = update.effective_user.id
-    
-    # First check if user is in channels
-    joined = await check_user_joined(user_id, context)
-    
-    if joined:
-        # User is in channels, add to verified if not already
-        add_verified(user_id)
-        return True
-    else:
-        # User is not in channels, remove from verified if exists
-        remove_verified(user_id)
-        return False
-
+# ============ BOT HANDLERS (ORIGINAL LOGIC - SAME AS YOUR CODE) ============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     add_user(user_id)
@@ -221,11 +221,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     joined = await check_user_joined(user_id, context)
     
     if joined:
-        # User is in channels, add to verified and show welcome
         add_verified(user_id)
         await show_welcome(update, context)
     else:
-        # User is not in channels, remove from verified and show join buttons
         remove_verified(user_id)
         await show_join_channels(update, context)
 
@@ -237,12 +235,10 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     joined = await check_user_joined(user_id, context)
     
     if not joined:
-        # User left channel, remove verification and show join buttons
         remove_verified(user_id)
         await show_join_channels(update, context)
         return
     
-    # User is joined, ensure verified status
     add_verified(user_id)
     
     text = update.message.text.strip()
@@ -291,7 +287,7 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         api_url = API_URL.format(url=text)
         
         async with aiohttp.ClientSession() as session:
-            async with session.get(api_url, timeout=6000) as response:
+            async with session.get(api_url, timeout=2000) as response:
                 if response.status != 200:
                     await msg.edit_text(
                         "❌ *ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ!*\n\n"
@@ -354,7 +350,7 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 filename = f"audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp3"
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(audio_url, timeout=6000) as response:
+                    async with session.get(audio_url, timeout=2000) as response:
                         if response.status == 200:
                             with open(filename, 'wb') as f:
                                 while True:
