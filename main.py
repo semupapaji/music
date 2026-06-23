@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from telegram.constants import ParseMode
 
 # ============ CONFIG ============
-BOT_TOKEN = "8870758259:AAFw__OmkcH1L8yrmFBXzKnVvq3NnlwK2Wg"  # @BotFather se lo
+BOT_TOKEN = "8870758259:AAGQXtt0qcHGrmPVYCUsQN1ivTeP3eIyoqc"  # @BotFather se lo
 OWNER_ID = 7326248826  # Apna Telegram ID
 API_URL = "https://r-gengpt-api.vercel.app/api/video/download?url={url}"
 DATA_FILE = "user_data.json"
