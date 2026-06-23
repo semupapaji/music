@@ -1,3 +1,4 @@
+
 # audio_bot.py
 import os
 import json
@@ -15,6 +16,12 @@ OWNER_ID = 7326248826  # Apna Telegram ID
 API_URL = "https://r-gengpt-api.vercel.app/api/video/download?url={url}"
 DATA_FILE = "user_data.json"
 VERIFIED_USERS_FILE = "verified_users.json"
+DOWNLOAD_DIR = "downloads"  # New: Download folder
+
+# ============ CREATE DOWNLOAD FOLDER ============
+if not os.path.exists(DOWNLOAD_DIR):
+    os.makedirs(DOWNLOAD_DIR)
+    print(f"📁 Created download folder: {DOWNLOAD_DIR}")
 
 # ============ CHANNELS ============
 CHANNELS = [
@@ -212,7 +219,7 @@ async def handle_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=keyboard  # Buttons again so user can retry
         )
 
-# ============ BOT HANDLERS (ORIGINAL LOGIC - SAME AS YOUR CODE) ============
+# ============ BOT HANDLERS ============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     add_user(user_id)
@@ -226,6 +233,126 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         remove_verified(user_id)
         await show_join_channels(update, context)
+
+async def download_and_send_audio(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str, platform: str, platform_emoji: str, msg):
+    """Download audio and send to user - Now with concurrent support"""
+    try:
+        # Fetch data from API
+        api_url = API_URL.format(url=url)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url, timeout=2000) as response:
+                if response.status != 200:
+                    await msg.edit_text(
+                        "❌ *ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ!*\n\n"
+                        "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    return
+                
+                data = await response.json()
+                
+                if data.get('status') != 'success':
+                    await msg.edit_text(
+                        "❌ *ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ!*\n\n"
+                        "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    return
+                
+                video_data = data.get('data', {})
+                title = video_data.get('title', 'Audio')
+                medias = video_data.get('medias', [])
+                
+                # Find audio
+                audio_url = None
+                best_quality = 0
+                
+                for media in medias:
+                    if media.get('type') == 'audio':
+                        bitrate = media.get('bitrate', 0)
+                        url_media = media.get('url')
+                        if url_media and bitrate > best_quality:
+                            best_quality = bitrate
+                            audio_url = url_media
+                
+                # If no dedicated audio, try video with audio
+                if not audio_url:
+                    for media in medias:
+                        if media.get('type') == 'video' and media.get('is_audio', False):
+                            url_media = media.get('url')
+                            if url_media:
+                                audio_url = url_media
+                                break
+                
+                if not audio_url:
+                    await msg.edit_text(
+                        "❌ *ɴᴏ ᴀᴜᴅɪᴏ ꜰᴏᴜɴᴅ!*\n\n"
+                        "ᴛʜɪꜱ ᴠɪᴅᴇᴏ ᴍɪɢʜᴛ ɴᴏᴛ ʜᴀᴠᴇ ᴀᴜᴅɪᴏ.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    return
+                
+                # Download audio to downloads folder
+                await msg.edit_text(
+                    f"⬇️ *ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀᴜᴅɪᴏ...*\n\n"
+                    f"📌 *ᴛɪᴛʟᴇ:* {title[:50]}...",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+                # Save file in downloads folder
+                filename = os.path.join(DOWNLOAD_DIR, f"audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{update.effective_user.id}.mp3")
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(audio_url, timeout=2000) as response:
+                        if response.status == 200:
+                            with open(filename, 'wb') as f:
+                                while True:
+                                    chunk = await response.content.read(8192)
+                                    if not chunk:
+                                        break
+                                    f.write(chunk)
+                            
+                            # Send audio
+                            await msg.edit_text(
+                                f"📤 *ꜱᴇɴᴅɪɴɢ ᴀᴜᴅɪᴏ...*\n\n"
+                                f"📌 *ᴛɪᴛʟᴇ:* {title[:50]}...",
+                                parse_mode=ParseMode.MARKDOWN
+                            )
+                            
+                            with open(filename, 'rb') as f:
+                                await update.message.reply_audio(
+                                    audio=f,
+                                    title=title[:100],
+                                    performer=platform,
+                                    caption=f"🎵 *ᴀᴜᴅɪᴏ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ*\n\n📌 *ꜱᴏᴜʀᴄᴇ:* {platform_emoji} {platform}",
+                                    parse_mode=ParseMode.MARKDOWN
+                                )
+                            
+                            # Delete file
+                            os.remove(filename)
+                            
+                            await msg.delete()
+                        else:
+                            await msg.edit_text(
+                                "❌ *ᴅᴏᴡɴʟᴏᴀᴅ ꜰᴀɪʟᴇᴅ!*\n\n"
+                                "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
+                                parse_mode=ParseMode.MARKDOWN
+                            )
+                            
+    except asyncio.TimeoutError:
+        await msg.edit_text(
+            "⏰ *ᴛɪᴍᴇᴏᴜᴛ!*\n\n"
+            "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        logger.error(f"Error for user {update.effective_user.id}: {e}")
+        await msg.edit_text(
+            "❌ *ꜱᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ!*\n\n"
+            "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
+            parse_mode=ParseMode.MARKDOWN
+        )
 
 async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -282,123 +409,8 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
     
-    try:
-        # Fetch data from API
-        api_url = API_URL.format(url=text)
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(api_url, timeout=2000) as response:
-                if response.status != 200:
-                    await msg.edit_text(
-                        "❌ *ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ!*\n\n"
-                        "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-                    return
-                
-                data = await response.json()
-                
-                if data.get('status') != 'success':
-                    await msg.edit_text(
-                        "❌ *ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ!*\n\n"
-                        "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-                    return
-                
-                video_data = data.get('data', {})
-                title = video_data.get('title', 'Audio')
-                medias = video_data.get('medias', [])
-                
-                # Find audio
-                audio_url = None
-                best_quality = 0
-                
-                for media in medias:
-                    if media.get('type') == 'audio':
-                        bitrate = media.get('bitrate', 0)
-                        url = media.get('url')
-                        if url and bitrate > best_quality:
-                            best_quality = bitrate
-                            audio_url = url
-                
-                # If no dedicated audio, try video with audio
-                if not audio_url:
-                    for media in medias:
-                        if media.get('type') == 'video' and media.get('is_audio', False):
-                            url = media.get('url')
-                            if url:
-                                audio_url = url
-                                break
-                
-                if not audio_url:
-                    await msg.edit_text(
-                        "❌ *ɴᴏ ᴀᴜᴅɪᴏ ꜰᴏᴜɴᴅ!*\n\n"
-                        "ᴛʜɪꜱ ᴠɪᴅᴇᴏ ᴍɪɢʜᴛ ɴᴏᴛ ʜᴀᴠᴇ ᴀᴜᴅɪᴏ.",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-                    return
-                
-                # Download audio
-                await msg.edit_text(
-                    f"⬇️ *ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀᴜᴅɪᴏ...*\n\n"
-                    f"📌 *ᴛɪᴛʟᴇ:* {title[:50]}...",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                
-                # Download file
-                filename = f"audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp3"
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(audio_url, timeout=2000) as response:
-                        if response.status == 200:
-                            with open(filename, 'wb') as f:
-                                while True:
-                                    chunk = await response.content.read(8192)
-                                    if not chunk:
-                                        break
-                                    f.write(chunk)
-                            
-                            # Send audio
-                            await msg.edit_text(
-                                f"📤 *ꜱᴇɴᴅɪɴɢ ᴀᴜᴅɪᴏ...*\n\n"
-                                f"📌 *ᴛɪᴛʟᴇ:* {title[:50]}...",
-                                parse_mode=ParseMode.MARKDOWN
-                            )
-                            
-                            with open(filename, 'rb') as f:
-                                await update.message.reply_audio(
-                                    audio=f,
-                                    title=title[:100],
-                                    performer=platform,
-                                    caption=f"🎵 *ᴀᴜᴅɪᴏ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ*\n\n📌 *ꜱᴏᴜʀᴄᴇ:* {platform_emoji} {platform}",
-                                    parse_mode=ParseMode.MARKDOWN
-                                )
-                            
-                            # Delete file
-                            os.remove(filename)
-                            
-                            await msg.delete()
-                        else:
-                            await msg.edit_text(
-                                "❌ *ᴅᴏᴡɴʟᴏᴀᴅ ꜰᴀɪʟᴇᴅ!*\n\n"
-                                "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
-                                parse_mode=ParseMode.MARKDOWN
-                            )
-                            
-    except asyncio.TimeoutError:
-        await msg.edit_text(
-            "⏰ *ᴛɪᴍᴇᴏᴜᴛ!*\n\n"
-            "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        await msg.edit_text(
-            "❌ *ꜱᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ!*\n\n"
-            "ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ.",
-            parse_mode=ParseMode.MARKDOWN
-        )
+    # IMPORTANT: Create task without awaiting - this allows concurrent processing
+    asyncio.create_task(download_and_send_audio(update, context, text, platform, platform_emoji, msg))
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -535,6 +547,7 @@ async def broadcast_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ============ MAIN ============
 def main():
+    # Create application with higher concurrency
     app = Application.builder().token(BOT_TOKEN).build()
     
     # Commands
@@ -552,6 +565,8 @@ def main():
     app.add_handler(CallbackQueryHandler(broadcast_cancel, pattern="cancel_broadcast"))
     
     print("🎵 Bot started! Send any link to get audio.")
+    print(f"📁 Audio files will be saved in: {DOWNLOAD_DIR}/")
+    print("🔄 Multiple users can process concurrently!")
     app.run_polling()
 
 if __name__ == "__main__":
